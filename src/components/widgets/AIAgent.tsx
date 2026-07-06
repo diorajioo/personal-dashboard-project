@@ -42,7 +42,7 @@ export function AIAgent() {
   }
 
   return (
-    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: -22, marginBottom: -22, paddingRight: 6, position: 'relative', zIndex: 10 }}>
+    <div style={{ position: 'fixed', bottom: 24, right: 24, zIndex: 1000 }}>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0 }}>
 
         {/* Panel */}
@@ -52,8 +52,8 @@ export function AIAgent() {
           maxHeight: open ? 320 : 0,
           opacity: open ? 1 : 0,
           transition: 'max-height .3s cubic-bezier(.4,0,.2,1), opacity .22s',
-          position: 'relative', zIndex: 5, marginBottom: open ? 10 : 0,
-          width: 296,
+          position: 'fixed', bottom: 80, right: 24, zIndex: 999,
+width: 296,
         }}>
           <div style={{ padding: '10px 13px', borderBottom: '0.5px solid var(--b)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span style={{ fontSize: 12, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 5 }}>
