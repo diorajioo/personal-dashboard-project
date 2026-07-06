@@ -13,40 +13,41 @@ function getSheets(accessToken: string) {
 // GET /api/finance — fetch dashboard summary from GSheet
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
-  if (!session?.accessToken) {
+  if (!session?.google?.accessToken) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   try {
-    const sheets = getSheets(session.accessToken)
+    const sheets = getSheets(session.google.accessToken)
     const sheetId = process.env.GOOGLE_SHEETS_ID!
 
-    // Expects sheet layout:
-    // Sheet1: Expenses — columns: Date, Description, Category, Amount
-    // Sheet2: Summary  — named cells for Income, Budget targets
-    // Sheet3: Savings  — columns: Goal Name, Current, Target
-    const [expensesRes, savingsRes] = await Promise.all([
+    // Sheet layout (matches finance_tracker_dummy.xlsx):
+    // Transactions: Date, Category, Description, Amount, Type, Account
+    // Savings Goals: Goal Name, Target Amount, Current Amount, Progress %, Target Date
+    const [transactionsRes, savingsRes] = await Promise.all([
       sheets.spreadsheets.values.get({
         spreadsheetId: sheetId,
-        range: 'Expenses!A2:D200',
+        range: 'Transactions!A2:F200',
       }),
       sheets.spreadsheets.values.get({
         spreadsheetId: sheetId,
-        range: 'Savings!A2:C20',
+        range: "'Savings Goals'!A2:E20",
       }),
     ])
 
-    const expRows = expensesRes.data.values || []
+    const txRows = transactionsRes.data.values || []
     const savRows = savingsRes.data.values || []
 
-    const expenses: Expense[] = expRows.map((row, i) => ({
-      id: `exp-${i}`,
-      date: row[0] || '',
-      description: row[1] || '',
-      category: row[2] || 'Other',
-      amount: parseFloat(row[3]) || 0,
-      source: 'manual',
-    }))
+    const expenses: Expense[] = txRows
+      .filter((row) => (row[4] || '').toLowerCase() === 'expense')
+      .map((row, i) => ({
+        id: `exp-${i}`,
+        date: row[0] || '',
+        description: row[2] || '',
+        category: row[1] || 'Other',
+        amount: Math.abs(parseFloat(row[3])) || 0,
+        source: 'manual',
+      }))
 
     // Group by category
     const categories: Record<string, { spent: number; budget: number }> = {}
@@ -56,14 +57,16 @@ export async function GET(req: NextRequest) {
     })
 
     const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0)
-    // Hardcoded income until you set up Sheet2 — easy to change
-    const income = 24500000
+
+    const income = txRows
+      .filter((row) => (row[4] || '').toLowerCase() === 'income')
+      .reduce((s, row) => s + (parseFloat(row[3]) || 0), 0)
 
     const savingsGoals = savRows.map((row, i) => ({
       id: `goal-${i}`,
       name: row[0] || 'Goal',
-      current: parseFloat(row[1]) || 0,
-      target: row[2] ? parseFloat(row[2]) : null,
+      current: parseFloat(row[2]) || 0,
+      target: row[1] ? parseFloat(row[1]) : null,
       color: ['#4fd1a5', '#7b9ef8', '#9b7ff4', '#f5c842'][i % 4],
     }))
 
@@ -71,7 +74,7 @@ export async function GET(req: NextRequest) {
       netBalance: income - totalExpenses,
       income,
       expenses: totalExpenses,
-      savingsRate: Math.round(((income - totalExpenses) / income) * 100),
+      savingsRate: income > 0 ? Math.round(((income - totalExpenses) / income) * 100) : 0,
       categories,
       recentExpenses: expenses.slice(-10).reverse(),
       savingsGoals,
@@ -84,26 +87,33 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// POST /api/finance — append a new expense row to GSheet
+// POST /api/finance — append a new transaction row to GSheet
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
-  if (!session?.accessToken) {
+  if (!session?.google?.accessToken) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   try {
     const body: Omit<Expense, 'id'> = await req.json()
-    const sheets = getSheets(session.accessToken)
+    const sheets = getSheets(session.google.accessToken)
     const sheetId = process.env.GOOGLE_SHEETS_ID!
 
     const today = new Date().toISOString().split('T')[0]
 
     await sheets.spreadsheets.values.append({
       spreadsheetId: sheetId,
-      range: 'Expenses!A:D',
+      range: 'Transactions!A:F',
       valueInputOption: 'USER_ENTERED',
       requestBody: {
-        values: [[body.date || today, body.description, body.category, body.amount]],
+        values: [[
+          body.date || today,
+          body.category,
+          body.description,
+          -Math.abs(body.amount),
+          'Expense',
+          'Manual',
+        ]],
       },
     })
 

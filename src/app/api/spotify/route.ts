@@ -1,58 +1,61 @@
-// src/app/api/spotify/now-playing/route.ts
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
+import { createWorker } from 'tesseract.js'
 
-export async function GET() {
-  const session = await getServerSession(authOptions)
+// POST /api/finance/ocr — extract amount + merchant from a receipt photo
+export async function POST(req: NextRequest) {
+  try {
+    const formData = await req.formData()
+    const file = formData.get('receipt') as File | null
 
-  if (!session?.spotify?.accessToken) {
-    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    if (!file) {
+      return NextResponse.json({ error: 'No receipt image provided' }, { status: 400 })
+    }
+
+    const buffer = Buffer.from(await file.arrayBuffer())
+
+    const worker = await createWorker('eng')
+    const { data: { text } } = await worker.recognize(buffer)
+    await worker.terminate()
+
+    const { amount, merchant } = parseReceipt(text)
+
+    return NextResponse.json({ amount, merchant, rawText: text })
+  } catch (err) {
+    console.error('OCR error:', err)
+    return NextResponse.json({ error: 'Failed to process receipt' }, { status: 500 })
   }
+}
 
-  if (session.spotify.error === 'RefreshFailed') {
-    return NextResponse.json({ error: 'Spotify token refresh failed, please re-login' }, { status: 401 })
-  }
+function parseReceipt(text: string): { amount: number | null; merchant: string | null } {
+  const lines = text
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean)
 
-  const headers = { Authorization: `Bearer ${session.spotify.accessToken}` }
+  // Merchant: usually the first non-empty line at the top of the receipt
+  const merchant = lines[0] || null
 
-  const [nowPlayingRes, queueRes] = await Promise.all([
-    fetch('https://api.spotify.com/v1/me/player/currently-playing', { headers }),
-    fetch('https://api.spotify.com/v1/me/player/queue', { headers }),
-  ])
+  // Amount: look for lines containing "total" first, fall back to largest number found
+  const numberPattern = /(?:rp\.?\s?)?([\d]{1,3}(?:[.,]\d{3})*(?:[.,]\d{2})?)/gi
 
-  // 204 = no active playback
-  if (nowPlayingRes.status === 204) {
-    return NextResponse.json({ isPlaying: false, track: null, queue: [] })
-  }
+  let totalLineAmount: number | null = null
+  const allAmounts: number[] = []
 
-  if (!nowPlayingRes.ok) {
-    return NextResponse.json(
-      { error: 'Failed to fetch now playing' },
-      { status: nowPlayingRes.status }
-    )
-  }
-
-  const nowPlaying = await nowPlayingRes.json()
-  const queueData = queueRes.ok ? await queueRes.json() : { queue: [] }
-
-  return NextResponse.json({
-    isPlaying: nowPlaying?.is_playing ?? false,
-    track: nowPlaying?.item
-      ? {
-          name: nowPlaying.item.name,
-          artist: nowPlaying.item.artists?.map((a: any) => a.name).join(', '),
-          album: nowPlaying.item.album?.name,
-          albumArt: nowPlaying.item.album?.images?.[0]?.url,
-          progressMs: nowPlaying.progress_ms,
-          durationMs: nowPlaying.item.duration_ms,
-          url: nowPlaying.item.external_urls?.spotify,
+  for (const line of lines) {
+    const matches = [...line.matchAll(numberPattern)]
+    for (const m of matches) {
+      const cleaned = m[1].replace(/\./g, '').replace(',', '.')
+      const value = parseFloat(cleaned)
+      if (!isNaN(value) && value > 0) {
+        allAmounts.push(value)
+        if (/total|jumlah|grand total/i.test(line) && !/subtotal/i.test(line)) {
+          totalLineAmount = value
         }
-      : null,
-    queue: (queueData.queue ?? []).slice(0, 5).map((t: any) => ({
-      name: t.name,
-      artist: t.artists?.map((a: any) => a.name).join(', '),
-      albumArt: t.album?.images?.[0]?.url,
-    })),
-  })
+      }
+    }
+  }
+
+  const amount = totalLineAmount ?? (allAmounts.length ? Math.max(...allAmounts) : null)
+
+  return { amount, merchant }
 }
