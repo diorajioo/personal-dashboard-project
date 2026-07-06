@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
-import { authOptions } from '../auth/[...nextauth]/route'
+import { authOptions } from '@/lib/auth'
 import type { Email, CalendarEvent } from '@/types'
 
 const GRAPH_BASE = 'https://graph.microsoft.com/v1.0'
