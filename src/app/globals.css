@@ -1,0 +1,107 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #0d0e12;
+  --s1: #141519;
+  --s2: #1a1c23;
+  --b: rgba(255, 255, 255, 0.065);
+  --bh: rgba(255, 255, 255, 0.11);
+  --t: #dde0ec;
+  --t2: #7c8099;
+  --t3: #3a3d50;
+  --acc: #7b9ef8;
+  --pur: #9b7ff4;
+  --grn: #4fd1a5;
+  --red: #f47b7b;
+  --amb: #f5c842;
+  --spg: #1db954;
+  --r: 13px;
+  --rs: 8px;
+}
+
+[data-theme='dim'] {
+  --bg: #111318;
+  --s1: #191c24;
+  --s2: #1f2230;
+  --t: #d8dbe8;
+  --t2: #6e7390;
+  --t3: #363950;
+  --b: rgba(255, 255, 255, 0.07);
+}
+
+[data-theme='light'] {
+  --bg: #f0f2f7;
+  --s1: #ffffff;
+  --s2: #f5f6fa;
+  --t: #1a1c2e;
+  --t2: #5a5e78;
+  --t3: #adb0c2;
+  --b: rgba(0, 0, 0, 0.08);
+  --bh: rgba(0, 0, 0, 0.14);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background: var(--bg);
+  color: var(--t);
+  margin: 0;
+  padding: 0;
+  transition: background 0.25s, color 0.25s;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--t3); border-radius: 2px; }
+
+/* Cards */
+.card {
+  background: var(--s1);
+  border: 0.5px solid var(--b);
+  border-radius: var(--r);
+  overflow: hidden;
+  transition: border-color 0.18s;
+}
+.card:hover { border-color: var(--bh); }
+
+/* Section labels */
+.sec-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--t3);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 10px;
+}
+
+/* Pills */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: 20px;
+  font-weight: 500;
+  line-height: 1.6;
+}
+.pill-green  { background: rgba(79,209,165,.1); color: var(--grn); }
+.pill-red    { background: rgba(244,123,123,.1); color: var(--red); }
+.pill-blue   { background: rgba(123,158,248,.1); color: var(--acc); }
+.pill-amber  { background: rgba(245,200,66,.1);  color: var(--amb); }
+.pill-purple { background: rgba(155,127,244,.1); color: var(--pur); }
+
+/* Divider */
+.div-line {
+  border: none;
+  border-top: 0.5px solid var(--b);
+  margin: 10px 0;
+}
